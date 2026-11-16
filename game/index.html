@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASHFALL YARD — Tactical FPS</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #0c0e10; font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #e8e6df; user-select: none; }
+  #app { position: fixed; inset: 0; }
+  canvas.webgl { display: block; width: 100%; height: 100%; }
+  .layer { position: absolute; pointer-events: none; }
+  /* crosshair */
+  #crosshair { left: 50%; top: 50%; width: 0; height: 0; }
+  #crosshair .dot { position: absolute; left: -2px; top: -2px; width: 4px; height: 4px;
+    background: #ffe9a8; border-radius: 50%; box-shadow: 0 0 3px #000; }
+  #crosshair .arm { position: absolute; background: #ffe9a8; box-shadow: 0 0 2px #000; }
+  #hitmarker { left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px;
+    opacity: 0; }
+  #hitmarker span { position: absolute; background: #ff5a3c; width: 10px; height: 2px; }
+  #hitmarker span:nth-child(1){ transform: rotate(45deg); left: 0; top: 0; }
+  #hitmarker span:nth-child(2){ transform: rotate(-45deg); right: 0; top: 0; }
+  #hitmarker span:nth-child(3){ transform: rotate(-45deg); left: 0; bottom: 0; }
+  #hitmarker span:nth-child(4){ transform: rotate(45deg); right: 0; bottom: 0; }
+  /* HUD */
+  #hud { inset: 0; }
+  .panel { background: rgba(10, 12, 14, 0.62); border: 1px solid rgba(232, 230, 223, 0.18);
+    border-radius: 4px; padding: 6px 10px; }
+  #topbar { top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;
+    align-items: center; font-weight: 700; letter-spacing: 1px; }
+  #topbar .score { font-size: 22px; }
+  #topbar .timer { font-size: 22px; color: #ffd75e; min-width: 64px; text-align: center; }
+  #topbar .round { font-size: 12px; color: #b9b4a6; }
+  #alive { top: 10px; left: 10px; font-size: 13px; line-height: 1.5; }
+  #alive .v { color: #6db3ff; } #alive .e { color: #ff7a5c; }
+  #money { top: 10px; right: 10px; text-align: right; font-size: 13px; line-height: 1.5; }
+  #money .cash { color: #7dd87d; font-weight: 700; font-size: 16px; }
+  #health { bottom: 14px; left: 14px; min-width: 210px; }
+  #health .hpnum { font-size: 30px; font-weight: 800; line-height: 1; }
+  #health .bar { height: 8px; background: #2a2e30; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+  #health .bar > div { height: 100%; background: linear-gradient(90deg, #e2574c, #f2a541); width: 100%; }
+  #health .armor { font-size: 12px; color: #9fc3ff; margin-top: 3px; }
+  #ammo { bottom: 14px; right: 14px; text-align: right; min-width: 150px; }
+  #ammo .mag { font-size: 30px; font-weight: 800; line-height: 1; }
+  #ammo .reserve { font-size: 14px; color: #b9b4a6; }
+  #ammo .wname { font-size: 12px; color: #ffd75e; letter-spacing: 1px; }
+  #killfeed { top: 64px; right: 10px; text-align: right; font-size: 13px; line-height: 1.6; }
+  #killfeed div { text-shadow: 0 1px 2px #000; }
+  #banner { top: 22%; left: 50%; transform: translateX(-50%); text-align: center; display: none; }
+  #banner .big { font-size: 44px; font-weight: 900; letter-spacing: 4px; text-shadow: 0 2px 12px #000; }
+  #banner .sub { font-size: 15px; color: #d8d2c2; text-shadow: 0 1px 4px #000; margin-top: 4px; }
+  #objective { bottom: 164px; left: 50%; transform: translateX(-50%); font-size: 13px;
+    text-align: center; text-shadow: 0 1px 3px #000; }
+  #objective .plant { color: #ffd75e; font-weight: 700; }
+  #progress { bottom: 200px; left: 50%; transform: translateX(-50%); width: 260px; display: none; }
+  #progress .label { text-align: center; font-size: 12px; letter-spacing: 2px; margin-bottom: 4px; }
+  #progress .track { height: 10px; background: #2a2e30; border-radius: 4px; overflow: hidden; }
+  #progress .fill { height: 100%; width: 0%; background: #ffd75e; }
+  #dmgdir { left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; opacity: 0; }
+  #dmgdir .arc { position: absolute; inset: 0; border: 3px solid transparent;
+    border-top-color: #ff3b30; border-radius: 50%; }
+  #minimap { bottom: 14px; left: 50%; transform: translateX(-50%); border: 1px solid rgba(232,230,223,.25);
+    border-radius: 4px; background: rgba(10,12,14,.55); }
+  /* buy menu */
+  #buy { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 560px; max-width: 92vw;
+    pointer-events: auto; display: none; background: rgba(12, 14, 16, 0.92);
+    border: 1px solid rgba(255, 215, 94, 0.4); border-radius: 6px; padding: 16px 18px; }
+  #buy h2 { margin: 0 0 4px 0; font-size: 20px; letter-spacing: 2px; color: #ffd75e; }
+  #buy .hint { font-size: 12px; color: #b9b4a6; margin-bottom: 10px; }
+  #buy table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  #buy td { padding: 6px 4px; border-bottom: 1px solid rgba(232,230,223,.08); }
+  #buy td.key { width: 34px; color: #ffd75e; font-weight: 700; }
+  #buy td.price { text-align: right; color: #7dd87d; font-weight: 700; width: 80px; }
+  #buy tr.owned td.name { color: #8fa8c8; }
+  #buy tr.cant td.price { color: #e2574c; }
+  /* overlays */
+  .overlay { inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; background: rgba(8, 9, 10, 0.72); pointer-events: auto; }
+  .overlay h1 { font-size: 52px; letter-spacing: 6px; margin: 0; color: #ffd75e;
+    text-shadow: 0 3px 18px #000; }
+  .overlay h1 .ash { color: #ff7a5c; }
+  .overlay .tag { font-size: 15px; letter-spacing: 3px; color: #d8d2c2; margin-top: 6px; }
+  .overlay .controls { margin-top: 22px; font-size: 14px; line-height: 1.9; color: #cfc9b8;
+    text-align: center; }
+  .overlay .controls b { color: #ffe9a8; }
+  .overlay button { margin-top: 26px; pointer-events: auto; cursor: pointer; font-size: 18px;
+    letter-spacing: 2px; font-weight: 800; color: #14161a; background: #ffd75e; border: none;
+    border-radius: 5px; padding: 12px 34px; }
+  .overlay button:hover { background: #ffe08a; }
+  #menu { z-index: 20; }
+  #matchend { z-index: 21; display: none; }
+  #matchend h1 { font-size: 40px; }
+  #scoreline { font-size: 26px; font-weight: 800; margin-top: 10px; }
+  #matchstats { margin-top: 14px; font-size: 14px; line-height: 1.8; color: #cfc9b8; text-align: center; }
+  #vignette { inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(120, 0, 0, 0.55) 100%);
+    opacity: 0; transition: opacity 0.25s; }
+  #fade { inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .4s; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud" class="layer">
+  <div id="topbar" class="layer panel">
+    <span class="v" style="color:#6db3ff">VANGUARD</span>
+    <span class="score"><span id="scoreV">0</span> : <span id="scoreE">0</span></span>
+    <span class="timer" id="timer">1:40</span>
+    <span class="e" style="color:#ff7a5c">EMBER</span>
+    <span class="round" id="roundLabel">ROUND 1/9</span>
+  </div>
+  <div id="alive" class="layer panel">
+    <div><span class="v">■ VANGUARD</span> <span id="aliveV">5</span> alive</div>
+    <div><span class="e">■ EMBER</span> <span id="aliveE">5</span> alive</div>
+  </div>
+  <div id="money" class="layer panel">
+    <div class="cash" id="cash">$800</div>
+    <div id="econNote">Buy phase — press B</div>
+  </div>
+  <div id="health" class="layer panel">
+    <div class="hpnum"><span id="hp">100</span><span style="font-size:14px;color:#b9b4a6"> HP</span></div>
+    <div class="bar"><div id="hpbar"></div></div>
+    <div class="armor" id="armorLine">No armor</div>
+  </div>
+  <div id="ammo" class="layer panel">
+    <div class="wname" id="wname">P9 SIDEARM</div>
+    <div class="mag"><span id="mag">12</span><span class="reserve"> / <span id="reserve">∞</span></span></div>
+    <div class="reserve" id="firemode">SEMI · LMB fire · RMB aim · R reload</div>
+  </div>
+  <div id="killfeed" class="layer"></div>
+  <div id="banner" class="layer"><div class="big" id="bannerBig"></div><div class="sub" id="bannerSub"></div></div>
+  <div id="objective" class="layer"></div>
+  <div id="progress" class="layer"><div class="label" id="progressLabel">PLANTING</div>
+    <div class="track"><div class="fill" id="progressFill"></div></div></div>
+  <div id="dmgdir" class="layer"><div class="arc"></div></div>
+  <canvas id="minimap" class="layer" width="180" height="132"></canvas>
+</div>
+<div id="crosshair" class="layer">
+  <div class="dot"></div>
+  <div class="arm" id="chT" style="left:-1px;top:-14px;width:2px;height:8px"></div>
+  <div class="arm" id="chB" style="left:-1px;top:6px;width:2px;height:8px"></div>
+  <div class="arm" id="chL" style="left:-14px;top:-1px;width:8px;height:2px"></div>
+  <div class="arm" id="chR" style="left:6px;top:-1px;width:8px;height:2px"></div>
+</div>
+<div id="hitmarker" class="layer"><span></span><span></span><span></span><span></span></div>
+<div id="vignette" class="layer"></div>
+
+<div id="buy" class="layer">
+  <h2>BUY PHASE</h2>
+  <div class="hint">Press 1–6 to buy, B or ESC to close. Money carries between rounds.</div>
+  <table id="buyTable"></table>
+</div>
+
+<div id="menu" class="layer overlay">
+  <h1>ASHFALL <span class="ash">YARD</span></h1>
+  <div class="tag">ROUND-BASED TACTICAL FPS · 5 v 5 · PLANT OR ELIMINATE</div>
+  <div class="controls">
+    <b>WASD</b> move &nbsp;·&nbsp; <b>Mouse</b> aim &nbsp;·&nbsp; <b>LMB</b> fire &nbsp;·&nbsp; <b>RMB</b> aim down sights<br>
+    <b>R</b> reload &nbsp;·&nbsp; <b>Shift</b> walk silent &nbsp;·&nbsp; <b>B</b> buy menu &nbsp;·&nbsp; <b>E</b> plant / defuse (hold)<br>
+    <b>1 / 2</b> switch weapon &nbsp;·&nbsp; <b>Space</b> jump &nbsp;·&nbsp; First to 5 rounds takes the match
+  </div>
+  <button id="deployBtn">CLICK TO DEPLOY</button>
+  <div class="controls" style="margin-top:14px;font-size:12px;color:#8d8778">
+    Vanguard attacks — plant the charge at Site A or Site B, or eliminate Ember.<br>
+    Win a round: +$3,250 · Lose: +$1,900 · Kill: +$300 · Plant: +$300
+  </div>
+</div>
+
+<div id="matchend" class="layer overlay">
+  <h1 id="endTitle">VANGUARD WINS</h1>
+  <div id="scoreline"></div>
+  <div id="matchstats"></div>
+  <button id="againBtn">PLAY AGAIN</button>
+</div>
+<div id="fade" class="layer"></div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

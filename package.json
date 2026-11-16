@@ -1,0 +1,1 @@
+{"description":"ASHFALL YARD — round-based tactical three.js FPS (make.fun threejs-fps-01 entry)","license":"MIT","name":"ashfall-yard","private":true,"scripts":{"build":"node main.ts","start":"node serve.ts"},"type":"module","version":"1.0.0"}
